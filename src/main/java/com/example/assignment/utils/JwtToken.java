@@ -1,6 +1,7 @@
 package com.example.assignment.utils;
 
-import io.jsonwebtoken.*;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 import jakarta.servlet.http.HttpServletRequest;
@@ -29,14 +30,14 @@ public class JwtToken {
     }
 
     // Signing key generation
-    private SecretKey getSignKey(){
+    private SecretKey getSignKey() {
         byte[] keyBytes = Decoders.BASE64.decode(SECRET_KEY);
         return Keys.hmacShaKeyFor(keyBytes);
     }
 
     // Token generation using mail
-    public String generateTokenByEmail(String email){
-        return  Jwts
+    public String generateTokenByEmail(String email) {
+        return Jwts
                 .builder()
                 .subject(email)
                 .issuedAt(new Date())
@@ -46,7 +47,7 @@ public class JwtToken {
     }
 
     // Email Extraction
-    public String extractEmail(String token){
+    public String extractEmail(String token) {
         return Jwts.parser()
                 .verifyWith((SecretKey) getSignKey())
                 .build()
@@ -79,18 +80,17 @@ public class JwtToken {
     }
 
     // check token expiration
-    private boolean isTokenExpired(String token){
+    private boolean isTokenExpired(String token) {
         return extractExpiration(token).before(new Date());
     }
 
     // Validate JWT
-    public boolean validateToken(String token, String email){
+    public boolean validateToken(String token, String email) {
 
+        final String extractedEmail = extractEmail(token);
+        System.out.println("Validate");
 
-            final String extractedEmail = extractEmail(token);
-            System.out.println("Validate");
-
-            return extractedEmail.equals(email) && !isTokenExpired(token);
+        return extractedEmail.equals(email) && !isTokenExpired(token);
     }
 
 

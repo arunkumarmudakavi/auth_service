@@ -5,8 +5,8 @@ import com.example.assignment.dto.RegisterReq;
 import com.example.assignment.entity.User;
 import com.example.assignment.repository.UserRepository;
 import com.example.assignment.utils.JwtToken;
+import com.example.assignment.utils.exception.ResourceNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -22,7 +22,7 @@ public class AuthService {
     @Autowired
     private JwtToken jwtToken;
 
-    public String register(RegisterReq request){
+    public String register(RegisterReq request) {
         User user = new User();
 
         user.setEmail(request.getEmail());
@@ -33,19 +33,19 @@ public class AuthService {
         return "User Registered Successfully!!!";
     }
 
-    public String login(LoginReq request){
+    public String login(LoginReq request) {
 
         User user = userRepository
                 .findByEmail(request.getEmail())
                 .orElseThrow(() ->
-                        new UsernameNotFoundException("User Not Found!"));
+                        new ResourceNotFoundException("User Not Found!"));
 
         boolean isPasswordMatches = passwordEncoder.matches(
                 request.getPassword(),
                 user.getPassword()
         );
 
-        if (!isPasswordMatches) throw new RuntimeException("Invalid Password!");
+        if (!isPasswordMatches) throw new ResourceNotFoundException("Invalid Password!");
 
         return jwtToken.generateTokenByEmail(user.getEmail());
     }

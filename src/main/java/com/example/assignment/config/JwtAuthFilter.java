@@ -6,7 +6,6 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -19,11 +18,18 @@ import java.io.IOException;
 @Component
 public class JwtAuthFilter extends OncePerRequestFilter {
 
-    @Autowired
-    private JwtToken jwtToken;
+    private final JwtToken jwtToken;
 
-    @Autowired
-    private CustomUserDetailsService customUserDetailsService;
+    private final CustomUserDetailsService customUserDetailsService;
+
+    public JwtAuthFilter(
+            JwtToken jwtToken,
+            CustomUserDetailsService customUserDetailsService
+    ) {
+
+        this.jwtToken = jwtToken;
+        this.customUserDetailsService = customUserDetailsService;
+    }
 
     @Override
     protected void doFilterInternal(
@@ -32,20 +38,45 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             FilterChain filterChain
     ) throws ServletException, IOException {
 
+        String requestPath = request.getServletPath();
+
+        // skip auth routes
+        if (requestPath.startsWith("/auth")) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
+        final String jwt = parseJwt(request);
+
+        // No token present return
+        if (jwt == null) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
         try {
-            String jwt = parseJwt(request);
             String email = jwtToken.extractEmail(jwt);
-            if (jwt != null && jwtToken.validateToken(jwt, email)){
+
+            if (email != null && SecurityContextHolder
+                    .getContext()
+                    .getAuthentication() == null) {
                 UserDetails userDetails = customUserDetailsService.loadUserByUsername(email);
 
-                UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
-                authenticationToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                SecurityContextHolder
-                        .getContext()
-                        .setAuthentication(authenticationToken);
+                boolean isValid = jwtToken.validateToken(jwt, userDetails.getUsername());
+
+                if (isValid) {
+                    UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
+                    authenticationToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                    SecurityContextHolder
+                            .getContext()
+                            .setAuthentication(authenticationToken);
+                }
             }
         } catch (Exception e) {
-            System.err.println(e);
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+
+            response.getWriter().write("Invalid JWT Token");
+            return;
         }
 
         filterChain.doFilter(request, response);
